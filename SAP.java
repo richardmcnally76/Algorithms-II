@@ -3,19 +3,16 @@ import edu.princeton.cs.algs4.BreadthFirstDirectedPaths;
 
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 
 public class SAP {
 
     private final Digraph G;
-    private final HashMap<Integer, HashMap<Integer, Integer>> reachableCache;
 
     // constructor takes a digraph (not necessarily a DAG)
     public SAP(Digraph G) {
-        this.G = G;
-        this.reachableCache = new HashMap<>();
+        this.G = new Digraph(G);
     }
 
     private boolean validVertex(int v) {
@@ -23,19 +20,9 @@ public class SAP {
     }
 
 
-    private HashMap<Integer, Integer> reachable(int from) {
-        if (this.reachableCache.containsKey(from))
-            return this.reachableCache.get(from);
-
-        BreadthFirstDirectedPaths dp = new BreadthFirstDirectedPaths(G, from);
-        HashMap<Integer, Integer> result = new HashMap<>();
-        for (int vertex = 0; vertex < G.V(); vertex++) {
-            int distance = dp.distTo(vertex);
-            if (distance == Integer.MAX_VALUE) continue;
-            result.put(vertex, distance);
-        }
-        this.reachableCache.put(from, result);
-        return result;
+    // Was caching, but heap memory was exceeded.
+    private BreadthFirstDirectedPaths getCachedBfs(Iterable<Integer> v) {
+        return new BreadthFirstDirectedPaths(G, v);
     }
 
     // length of shortest ancestral path between v and w; -1 if no such path
@@ -45,21 +32,30 @@ public class SAP {
         if (!validVertex(w))
             throw new IllegalArgumentException("Invalid w:" + w);
 
-        HashMap<Integer, Integer> reachableV = reachable(v);
-        HashMap<Integer, Integer> reachableW = reachable(w);
+        BreadthFirstDirectedPaths bfsV = getCachedBfs(List.of(v));
+        BreadthFirstDirectedPaths bfsW = getCachedBfs(List.of(w));
 
-        HashSet<Integer> inBoth = new HashSet<>(reachableV.keySet());
-        inBoth.retainAll(reachableW.keySet());
+        int shortestDistance = Integer.MAX_VALUE;
+        int ancestor = -1;
 
-        if (inBoth.isEmpty()) return -1;
+        for (int i = 0; i < this.G.V(); i++) {
+            int vDist = bfsV.distTo(i);
+            if (vDist == Integer.MAX_VALUE) continue;
+            int wDist = bfsW.distTo(i);
+            if (wDist == Integer.MAX_VALUE) continue;
 
-        int result = Integer.MAX_VALUE;
-        for (int shared : inBoth) {
-            result = Math.min(result,
-                    reachableV.get(shared) + reachableW.get(shared));
+            int thisDistance = vDist + wDist;
+            if (thisDistance < shortestDistance) {
+                shortestDistance = thisDistance;
+                ancestor = i;
+            }
         }
-        return result;
+
+        if (ancestor == -1) return -1;
+
+        return shortestDistance;
     }
+
 
     // a common ancestor of v and w that participates in a shortest ancestral
     // path; -1 if no such path
@@ -69,23 +65,26 @@ public class SAP {
         if (!validVertex(w))
             throw new IllegalArgumentException("Invalid w:" + w);
 
-        HashMap<Integer, Integer> reachableV = reachable(v);
-        HashMap<Integer, Integer> reachableW = reachable(w);
+        BreadthFirstDirectedPaths bfsV = getCachedBfs(List.of(v));
+        BreadthFirstDirectedPaths bfsW = getCachedBfs(List.of(w));
 
-        HashSet<Integer> inBoth = new HashSet<>(reachableV.keySet());
-        inBoth.retainAll(reachableW.keySet());
+        int shortestDistance = Integer.MAX_VALUE;
+        int ancestor = -1;
 
-        int minDistance = Integer.MAX_VALUE;
-        int result = -1;
+        for (int i = 0; i < this.G.V(); i++) {
+            int vDist = bfsV.distTo(i);
+            if (vDist == Integer.MAX_VALUE) continue;
+            int wDist = bfsW.distTo(i);
+            if (wDist == Integer.MAX_VALUE) continue;
 
-        for (int shared : inBoth) {
-            int thisDistance = reachableV.get(shared) + reachableW.get(shared);
-            if (thisDistance < minDistance) {
-                minDistance = thisDistance;
-                result = shared;
+            int thisDistance = vDist + wDist;
+            if (thisDistance < shortestDistance) {
+                shortestDistance = thisDistance;
+                ancestor = i;
             }
         }
-        return result;
+
+        return ancestor;
     }
 
     // length of shortest ancestral path between any vertex in v and any
@@ -93,27 +92,42 @@ public class SAP {
     public int length(Iterable<Integer> v, Iterable<Integer> w) {
         if (v == null || w == null)
             throw new IllegalArgumentException("Null argument passed");
+        boolean empty = true;
+        for (Integer node : v) {
+            empty = false;
+            if (node == null || !this.validVertex(node))
+                throw new IllegalArgumentException("Invalid v:" + node);
+        }
+        if  (empty) return -1;
+        empty = true;
+        for (Integer node : w) {
+            empty = false;
+            if (node == null || !this.validVertex(node))
+                throw new IllegalArgumentException("Invalid v:" + node);
+        }
+        if (empty) return -1;
 
-        int minDistance = Integer.MAX_VALUE;
-        boolean matchFound = false;
+        BreadthFirstDirectedPaths bfsV = getCachedBfs(v);
+        BreadthFirstDirectedPaths bfsW = getCachedBfs(w);
 
-        for (Integer vNode : v) {
-            if (vNode == null || !validVertex(vNode))
-                throw new IllegalArgumentException();
-            for (Integer wNode : w) {
-                if (wNode == null || !validVertex(wNode))
-                    throw new IllegalArgumentException();
+        int shortestDistance = Integer.MAX_VALUE;
+        int ancestor = -1;
 
-                int thisLength = length(vNode, wNode);
-                if (thisLength != -1) {
-                    minDistance = Math.min(minDistance, thisLength);
-                    matchFound = true;
-                }
+        for (int i = 0; i < this.G.V(); i++) {
+            int vDist = bfsV.distTo(i);
+            if (vDist == Integer.MAX_VALUE) continue;
+            int wDist = bfsW.distTo(i);
+            if (wDist == Integer.MAX_VALUE) continue;
+
+            int thisDistance = vDist + wDist;
+            if (thisDistance < shortestDistance) {
+                shortestDistance = thisDistance;
+                ancestor = i;
             }
         }
 
-        if (!matchFound) return -1;
-        return minDistance;
+        if (ancestor == -1) return -1;
+        return shortestDistance;
     }
 
     // a common ancestor that participates in shortest ancestral path; -1 if
@@ -121,29 +135,41 @@ public class SAP {
     public int ancestor(Iterable<Integer> v, Iterable<Integer> w) {
         if (v == null || w == null)
             throw new IllegalArgumentException("Null argument passed");
+        boolean empty = true;
+        for (Integer node : v) {
+            empty = false;
+            if (node == null || !this.validVertex(node))
+                throw new IllegalArgumentException("Invalid v:" + node);
+        }
+        if  (empty) return -1;
+        empty = true;
+        for (Integer node : w) {
+            empty = false;
+            if (node == null || !this.validVertex(node))
+                throw new IllegalArgumentException("Invalid v:" + node);
+        }
+        if (empty) return -1;
 
-        int minDistance = Integer.MAX_VALUE;
-        int minV = -1;
-        int minW = -1;
+        BreadthFirstDirectedPaths bfsV = getCachedBfs(v);
+        BreadthFirstDirectedPaths bfsW = getCachedBfs(w);
 
-        for (Integer vNode : v) {
-            if (vNode == null || !validVertex(vNode))
-                throw new IllegalArgumentException();
-            for (Integer wNode : w) {
-                if (wNode == null || !validVertex(wNode))
-                    throw new IllegalArgumentException();
+        int shortestDistance = Integer.MAX_VALUE;
+        int ancestor = -1;
 
-                int thisLength = length(vNode, wNode);
-                if (thisLength < minDistance) {
-                    minDistance = thisLength;
-                    minV = vNode;
-                    minW = wNode;
-                }
+        for (int i = 0; i < this.G.V(); i++) {
+            int vDist = bfsV.distTo(i);
+            if (vDist == Integer.MAX_VALUE) continue;
+            int wDist = bfsW.distTo(i);
+            if (wDist == Integer.MAX_VALUE) continue;
+
+            int thisDistance = vDist + wDist;
+            if (thisDistance < shortestDistance) {
+                shortestDistance = thisDistance;
+                ancestor = i;
             }
         }
 
-        if (minV == -1) return -1;
-        return ancestor(minV, minW);
+        return ancestor;
     }
 
     // do unit testing of this class
@@ -158,14 +184,6 @@ public class SAP {
         G.addEdge(4, 5);
 
         SAP sap = new SAP(G);
-
-        HashMap<Integer, Integer> reachable = sap.reachable(0);
-        assert reachable.containsKey(0);
-        assert reachable.containsKey(1);
-        assert reachable.containsKey(2);
-        assert !reachable.containsKey(3);
-        assert !reachable.containsKey(4);
-        assert !reachable.containsKey(5);
 
         assert sap.length(0, 3) == 3;
         assert sap.length(1, 3) == 2;
