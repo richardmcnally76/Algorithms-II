@@ -1,9 +1,11 @@
+Algorithms-II.iml
 algs4.jar
-WordNet.class
-wordnet/*
-WordNet.zip
+test.bat
+
+*.zip
 *.class
+
+seam/*
+wordnet/*
 .idea/
 .vscode/
-Algorithms-II.iml
-test.bat
