@@ -12,24 +12,44 @@ import java.util.PriorityQueue;
 
 public class SeamCarver {
 
-    private Picture picture;
     private int adjCalls = 0;
-    private int[][] imageBuffer;
+    private int[][] buf;
+    private int width;
+    private int height;
 
     // create a seam carver object based on the given picture
     public SeamCarver(Picture picture) {
         if (picture == null) throw new IllegalArgumentException();
-        this.picture = new Picture(picture);
+
+        this.width = picture.width();
+        this.height = picture.height();
+        this.buf = new int[this.width][this.height];
+        for (int x = 0; x < this.width; x++) {
+            for (int y = 0; y < this.height; y++) {
+                buf[x][y] = picture.getRGB(x, y);
+//                buf[x][y] = picture.getARGB(x, y);
+            }
+        }
+    }
+
+    // current picture
+    public Picture picture() {
+        Picture picture = new Picture(width, height);
+        for (int x = 0; x < this.width; x++)
+            for (int y = 0; y < this.height; y++)
+                picture.setRGB(x, y, this.buf[x][y]);
+//                picture.setARGB(x, y, this.buf[x][y]);
+        return picture;
     }
 
     // width of current picture
     public int width() {
-        return this.picture.width();
+        return this.width;
     }
 
     // height of current picture
     public int height() {
-        return this.picture.height();
+        return this.height;
     }
 
     // The graph generated will have virtual vertices for the source and sink.
@@ -40,28 +60,28 @@ public class SeamCarver {
     private final static int VIRTUAL_SINK_VERTEX = 1;
 
     private int V() {
-        return width() * height() + VIRTUAL_VERTEX_COUNT;
+        return this.width * this.height + VIRTUAL_VERTEX_COUNT;
     }
 
     private int xyToV(int x, int y) {
         assert x >= 0 : "x must be > 0";
         assert y >= 0 : "y must be > 0";
-        assert x < width() : "x must be <= width";
-        assert y < height() : "y must be <= height";
+        assert x < this.width : "x must be <= width";
+        assert y < this.height : "y must be <= height";
 
-        return y * width() + x + VIRTUAL_VERTEX_COUNT;
+        return y * this.width + x + VIRTUAL_VERTEX_COUNT;
     }
 
     private int vToX(int v) {
         assert v >= VIRTUAL_VERTEX_COUNT : "No x for virtual vertex: " + v;
         assert v < V() : "Vertex > " + V() + ": " + v;
-        return (v - VIRTUAL_VERTEX_COUNT) % width();
+        return (v - VIRTUAL_VERTEX_COUNT) % this.width;
     }
 
     private int vToY(int v) {
         assert v >= VIRTUAL_VERTEX_COUNT : "No x for virtual vertex: " + v;
         assert v < V() : "Vertex > " + V() + ": " + v;
-        return (v - VIRTUAL_VERTEX_COUNT) / width();
+        return (v - VIRTUAL_VERTEX_COUNT) / this.width;
     }
 
     private int[] vsToXs(int[] vs) {
@@ -81,17 +101,16 @@ public class SeamCarver {
     }
 
     private DirectedEdge getDirectedEdge(int from, int toX, int toY,
-                                         boolean topDown) {
+                                         boolean td) {
         int v = xyToV(toX, toY);
         double weight = 1000.0; // Default for borders.
 
         // Using default for the last row/column is inefficient. It will cause
         // more exploration trying to avoid what is in reality a fixed cost.
         // Removing the "if (...) {...} else" will restore all borders to 1000.
-        if ((topDown && toY == height() - 1) || (!topDown && toX == width()
-                - 1)) {
+        if ((td && toY == this.height - 1) || (!td && toX == this.width - 1)) {
             weight = 0;
-        } else if (toX > 0 && toY > 0 && toX < width() - 1 && toY < height() - 1) {
+        } else if (toX > 0 && toY > 0 && toX < this.width - 1 && toY < this.height - 1) {
             weight = energy(toX, toY);
         }
         return new DirectedEdge(from, xyToV(toX, toY), weight);
@@ -104,9 +123,9 @@ public class SeamCarver {
 
         // The source node has edges to each top/left vertex as appropriate.
         if (v == VIRTUAL_SOURCE_VERTEX) {
-            if (topDown) for (int i = 0; i < width(); i++)
+            if (topDown) for (int i = 0; i < this.width; i++)
                 edges.add(new DirectedEdge(0, xyToV(i, 0), 1000.0));
-            else for (int i = 0; i < height(); i++)
+            else for (int i = 0; i < this.height; i++)
                 edges.add(new DirectedEdge(0, xyToV(0, i), 1000.0));
             return edges;
         }
@@ -119,23 +138,23 @@ public class SeamCarver {
 
         if (topDown) {
             // Edge from the bottom row to the sink
-            if (y == height() - 1) {
+            if (y == this.height - 1) {
                 edges.add(new DirectedEdge(v, 1, 0.0));
                 return edges;
             }
             if (x > 0) edges.add(getDirectedEdge(v, x - 1, y + 1, topDown));
             edges.add(getDirectedEdge(v, x, y + 1, topDown));
-            if (x < width() - 1)
+            if (x < this.width - 1)
                 edges.add(getDirectedEdge(v, x + 1, y + 1, topDown));
         } else {
             // Edge from the right column to the sink
-            if (x == width() - 1) {
+            if (x == this.width - 1) {
                 edges.add(new DirectedEdge(v, 1, 0.0));
                 return edges;
             }
             if (y > 0) edges.add(getDirectedEdge(v, x + 1, y - 1, topDown));
             edges.add(getDirectedEdge(v, x + 1, y, topDown));
-            if (y < height() - 1)
+            if (y < this.height - 1)
                 edges.add(getDirectedEdge(v, x + 1, y + 1, topDown));
         }
         return edges;
@@ -143,13 +162,8 @@ public class SeamCarver {
 
 
     private void validateCoords(int x, int y) {
-        if (x < 0 || x > width() || y < 0 || y > height())
+        if (x < 0 || x >= this.width || y < 0 || y >= this.height)
             throw new IllegalArgumentException("Bad coord: " + x + "," + y);
-    }
-
-    // current picture
-    public Picture picture() {
-        return new Picture(this.picture);
     }
 
     private int[] dijkstraSingleSourceAndSink(int source, int sink,
@@ -197,22 +211,34 @@ public class SeamCarver {
         return null;
     }
 
-    private double gradientPart(Color a, Color b) {
-        double deltaRSquired = Math.pow(a.getRed() - b.getRed(), 2);
-        double deltaGSquared = Math.pow(a.getGreen() - b.getGreen(), 2);
-        double deltaBSquared = Math.pow(a.getBlue() - b.getBlue(), 2);
+    static private int rFromRBG(int rgb) {
+        return (rgb >> 16) & 0xFF;
+    }
+
+    static private int gFromRBG(int rgb) {
+        return (rgb >> 8) & 0xFF;
+    }
+
+    static private int bFromRBG(int rgb) {
+        return (rgb) & 0xFF;
+    }
+
+
+    private double gradientPart(int a, int b) {
+        double deltaRSquired = Math.pow(rFromRBG(a) - rFromRBG(b), 2);
+        double deltaGSquared = Math.pow(gFromRBG(a) - gFromRBG(b), 2);
+        double deltaBSquared = Math.pow(bFromRBG(a) - bFromRBG(b), 2);
         return deltaRSquired + deltaGSquared + deltaBSquared;
     }
 
     // energy of pixel at column x and row y
     public double energy(int x, int y) {
         validateCoords(x, y);
-        if (x == 0 || y == 0 || x == width() - 1 || y == height() - 1)
+        if (x == 0 || y == 0 || x == this.width - 1 || y == this.height - 1)
             return 1000;
-        double partX = gradientPart(this.picture.get(x - 1, y),
-                this.picture.get(x + 1, y));
-        double partY = gradientPart(this.picture.get(x, y - 1),
-                this.picture.get(x, y + 1));
+        Color c = new Color(buf[x][y]);
+        double partX = gradientPart(this.buf[x - 1][y], this.buf[x + 1][y]);
+        double partY = gradientPart(this.buf[x][y - 1], this.buf[x][y + 1]);
         return Math.sqrt(partX + partY);
     }
 
@@ -248,36 +274,28 @@ public class SeamCarver {
 
     // remove horizontal seam from current picture
     public void removeHorizontalSeam(int[] seam) {
-        validateSeam(seam, width(), height() - 1);
-        Picture newPicture = new Picture(this.picture.width(),
-                this.picture.height() - 1);
-        for (int x = 0; x < this.picture.width(); x++) {
-            int yTo = 0;
-            for (int yFrom = 0; yFrom < this.picture.height(); yFrom++) {
-                if (yFrom == seam[x]) continue; // This is the one to skip
-//                newPicture.setRGB(x, yTo, this.picture.getRGB(x, yFrom));
-                newPicture.setARGB(x, yTo, this.picture.getARGB(x, yFrom));
-                yTo++;
+        validateSeam(seam, this.width, this.height - 1);
+        for (int x = 0; x < this.width; x++) {
+            // Everything remains the same from before the seam is hit, then
+            // move everything forward 1 pixel.
+            for (int y = seam[x]; y < this.height - 1; y++) {
+                buf[x][y] = buf[x][y + 1];
             }
         }
-        this.picture = newPicture;
+        this.height--;
     }
 
     // remove vertical seam from current picture
     public void removeVerticalSeam(int[] seam) {
-        validateSeam(seam, height(), width() - 1);
-        Picture newPicture = new Picture(this.picture.width() - 1,
-                this.picture.height());
-        for (int y = 0; y < this.picture.height(); y++) {
-            int xTo = 0;
-            for (int xFrom = 0; xFrom < this.picture.width(); xFrom++) {
-                if (xFrom == seam[y]) continue; // This is the one to skip
-//                newPicture.setRGB(xTo, y, this.picture.getRGB(xFrom, y));
-                newPicture.setARGB(xTo, y, this.picture.getARGB(xFrom, y));
-                xTo++;
+        validateSeam(seam, this.height, this.width - 1);
+        for (int y = 0; y < this.height; y++) {
+            // Everything remains the same from before the seam is hit, then
+            // move everything forward 1 pixel.
+            for (int x = seam[y]; x < this.width - 1; x++) {
+                buf[x][y] = buf[x + 1][y];
             }
         }
-        this.picture = newPicture;
+        this.width--;
     }
 
     //  unit testing (optional)
@@ -318,10 +336,14 @@ public class SeamCarver {
         assert sc.t(19, true, "[19->24 194.50, 19->25 1000.00]");
         // These are accurate without the optimization in getDirectedEdge.
         // assert sc.t(20, true, "[20->26 1000.00, 20->27 1000.00]");
-        // assert sc.t(21, true, "[21->26 1000.00, 21->27 1000.00, 21->28 1000.00]");
-        // assert sc.t(22, true, "[22->27 1000.00, 22->28 1000.00, 22->29 1000.00]");
-        // assert sc.t(23, true, "[23->28 1000.00, 23->29 1000.00, 23->30 1000.00]");
-        // assert sc.t(24, true, "[24->29 1000.00, 24->30 1000.00, 24->31 1000.00]");
+        // assert sc.t(21, true, "[21->26 1000.00, 21->27 1000.00, 21->28
+        // 1000.00]");
+        // assert sc.t(22, true, "[22->27 1000.00, 22->28 1000.00, 22->29
+        // 1000.00]");
+        // assert sc.t(23, true, "[23->28 1000.00, 23->29 1000.00, 23->30
+        // 1000.00]");
+        // assert sc.t(24, true, "[24->29 1000.00, 24->30 1000.00, 24->31
+        // 1000.00]");
         // assert sc.t(25, true, "[25->30 1000.00, 25->31 1000.00]");
 
         assert sc.t(20, true, "[20->26  0.00, 20->27  0.00]");
@@ -393,12 +415,24 @@ public class SeamCarver {
         sc = new SeamCarver(picture);
         sc.removeVerticalSeam(verticalSeam);
 
+        boolean correctExceptionThrown = false;
+        try {
+            picture = new Picture("seam/6x5.png");
+            sc = new SeamCarver(picture);
+            sc.energy(6, 4);
+        }
+        catch (IllegalArgumentException e) {
+            correctExceptionThrown = true;
+        }
+        finally{
+            assert correctExceptionThrown : "Wrong exception type";
+        }
 
         picture = new Picture("seam/chameleon.png");
         sc = new SeamCarver(picture);
 
         Stopwatch stopwatch = new Stopwatch();
-        for (int i = 0; i < 200; i++) {
+        for (int i = 0; i < 50; i++) {
             verticalSeam = sc.findVerticalSeam();
             sc.removeVerticalSeam(verticalSeam);
         }
