@@ -5,6 +5,8 @@ test.bat
 *.zip
 *.class
 
+_algs4_/
+baseball/*
 seam/*
 wordnet/*
 .idea/

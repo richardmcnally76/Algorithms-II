@@ -22,7 +22,7 @@ public class WordNet {
         In synsetsIn = new In(synsets);
         String[] lines = synsetsIn.readAllLines();
         this.synsetValues = new String[lines.length];
-        this.theNouns = new HashMap<String, LinkedList<Integer>>();
+        this.theNouns = new HashMap<>();
         for (String line : lines) {
             String[] splitLine = line.split(",");
             int id = Integer.parseInt(splitLine[0]);
