@@ -5,9 +5,10 @@ test.bat
 *.zip
 *.class
 
-_algs4_/
+_algs4_/*
 baseball/*
+boggle/*
 seam/*
 wordnet/*
-.idea/
-.vscode/
+.idea/*
+.vscode/*
